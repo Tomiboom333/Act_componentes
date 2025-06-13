@@ -1,22 +1,22 @@
 #include <circ_comb.h>
 #include <stm32f103xb.h>
-
+//Multiplexor 1
 #define MUX1_IN_0 0 //pa
 #define MUX1_IN_1 1 //pa
 #define MUX1_SELENT 2 //pa
 #define MUX1_OUT 0 //pb
-
+//Multiplexor 2
 #define MUX2_IN_0 4 //pa
 #define MUX2_IN_1 5 //pa
 #define MUX2_SELENT 6 //pa
 #define MUX2_OUT 5 //pb
-
+//Contador anillo
 #define CONT_CLK 3 //pa
 #define CONT_OUT_0 1 //pb
-#define CONT_OUT_1 2 //pb
+#define CONT_OUT_1 15 //pb
 #define CONT_OUT_2 3 //pb
 #define CONT_OUT_3 4 //pb
-
+//Sumador
 #define SUM_A0 9 //pa
 #define SUM_A1 10 //pa
 #define SUM_B0 11 //pa
@@ -27,7 +27,7 @@
 #define SUM_CO 14 //pb
 
 int pinesA[12] = {0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 15}; 
-int pinesB[9] = {0, 1, 2, 3, 4, 5, 12, 13, 14};
+int pinesB[9] = {0, 1, 15, 3, 4, 5, 12, 13, 14};
 
 void Circ_Init(){
     RCC -> APB2ENR |= RCC_APB2ENR_IOPAEN;
@@ -98,18 +98,38 @@ void conta(){
             posicion++;
             delay_ms(100);
         }
-        
     }
 }
 void sum(){
-    int pa9 = GPIOA -> IDR & (1 << SUM_A0);
-    int pa10 = GPIOA -> IDR & (1 << SUM_A1);
-    int pa11 = GPIOA -> IDR & (1 << SUM_B0);
-    int pa12 = GPIOA -> IDR & (1 << SUM_B1);
-    int pa15 = GPIOA -> IDR & (1 << SUM_CY);
-    int cy;
-    int A = pa9 + pa11;
-    int B = pa10 + pa12;
-    //preguntarse por carrys
-    int suma = A | (B << 1) | (cy << 2);
+    int a0 = GPIOA -> IDR & (1 << SUM_A0);
+    int a1 = GPIOA -> IDR & (1 << SUM_A1);
+    int b0 = GPIOA -> IDR & (1 << SUM_B0);
+    int b1 = GPIOA -> IDR & (1 << SUM_B1);
+    int cy = GPIOA -> IDR & (1 << SUM_CY);
+    int cyInterno1 = 0;
+    int cyInterno2 = 0;
+    //z0
+    if (a0==b0){
+        GPIOB -> BSRR |= (1 << SUM_Z0+16);
+        if(a0||b0)  cyInterno1 = 1;
+    }    
+    else GPIOB -> BSRR |= (1 << SUM_Z0);
+    //z1
+    if (a1==b1){
+        if(cyInterno1) GPIOB -> BSRR |= (1 << SUM_Z1);
+        else GPIOB -> BSRR |= (1 << SUM_Z1+16);
+        if(a1||b1)  cyInterno2 = 1;    
+    }
+    else{
+        if(a1||b1){
+            if(cyInterno1){
+                GPIOB -> BSRR |= (1 << SUM_Z1+16);
+                cyInterno2 = 1;
+            }
+            else GPIOB -> BSRR |= (1 << SUM_Z1);
+        }
+    }
+    //co
+    if (cyInterno2==cy) GPIOB -> BSRR |= (1 << SUM_CO+16);
+    else   GPIOB -> BSRR |= (1 << SUM_CO);
 }
